@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Stock Levels</title>
+  </head>
+  <body>
+    <header>
+      <h1>Stock Levels</h1>
+      <div>
+        <a class="cart-link" href="/admin">Products</a>
+        <a class="cart-link" href="/">Catalog</a>
+        <a class="cart-link" href="/logout">Logout</a>
+      </div>
+    </header>
+    <main>
+      <table class="cart-table">
+        <tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
+        {% for p in products %}
+          <tr style="{% if p.stock < 10 %}background:#ffe0e0{% endif %}">
+            <td>{{ p.name }}</td>
+            <td>${{ '%.2f'|format(p.price) }}</td>
+            <td>{{ p.stock }}</td>
+            <td>
+              {% if p.stock == 0 %}
+                <span style="color:red;font-weight:bold">Out of stock</span>
+              {% elif p.stock < 10 %}
+                <span style="color:orange;font-weight:bold">Low stock</span>
+              {% else %}
+                <span style="color:green">In stock</span>
+              {% endif %}
+            </td>
+            <td><a class="btn small" href="/admin/edit/{{ p.id }}">Edit</a></td>
+          </tr>
+        {% endfor %}
+      </table>
+    </main>
+  </body>
+</html>

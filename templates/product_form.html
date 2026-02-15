@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>{{ action }} Product</title>
+  </head>
+  <body>
+    <header>
+      <h1>{{ action }} Product</h1>
+      <a class="cart-link" href="/admin">Back</a>
+    </header>
+    <main>
+      <form method="post" enctype="multipart/form-data">
+        <label>Name</label>
+        <input name="name" value="{{ product.name if product else '' }}" />
+        <label>Price</label>
+        <input name="price" value="{{ product.price if product else '0.00' }}" />
+        <label>Stock</label>
+        <input name="stock" type="number" value="{{ product.stock if product else '50' }}" />
+        <label>Image (optional)</label>
+        <input name="image_file" type="file" />
+        <button class="btn" type="submit">{{ action }}</button>
+      </form>
+    </main>
+  </body>
+</html>

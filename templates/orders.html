@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Your Orders</title>
+  </head>
+  <body>
+    <header>
+      <h1>Your Orders</h1>
+      <div>
+        <a class="cart-link" href="/">Catalog</a>
+        <a class="cart-link" href="/logout">Logout</a>
+      </div>
+    </header>
+    <main>
+      {% if orders %}
+        {% for o in orders %}
+          <div style="border:1px solid #ddd;padding:12px;margin-bottom:12px;border-radius:4px">
+            <h3>Order #{{ o.id }} - ${{ '%.2f'|format(o.total) }}</h3>
+            <p>{{ o.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            <table class="cart-table" style="margin-bottom:12px">
+              <tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>
+              {% for item in o.items %}
+                <tr>
+                  <td>{{ item.product_name }}</td>
+                  <td>{{ item.qty }}</td>
+                  <td>${{ '%.2f'|format(item.price) }}</td>
+                  <td>${{ '%.2f'|format(item.price * item.qty) }}</td>
+                </tr>
+              {% endfor %}
+            </table>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p>No orders yet.</p>
+      {% endif %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Checkout</title>
+  </head>
+  <body>
+    <header>
+      <h1>Checkout</h1>
+      <a class="cart-link" href="/">Catalog</a>
+    </header>
+    <main>
+      <p>Paid ${{ '%.2f'|format(total) }} — Thank you!</p>
+      <p>Order #{{ order_id }}</p>
++      <p><a class="btn" href="/orders">View your orders</a></p>
+    </main>
+  </body>
+</html>

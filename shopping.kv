@@ -1,0 +1,67 @@
+#:kivy 2.1.0
+
+MainScreenManager:
+    CatalogScreen:
+    CartScreen:
+
+<CatalogScreen>:
+    name: 'catalog'
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: None
+            height: '48dp'
+            padding: 8
+            spacing: 8
+            Label:
+                text: 'Shopping App'
+            Label:
+                id: cart_count
+                text: '0'
+        ScrollView:
+            GridLayout:
+                id: products_container
+                cols: 1
+                size_hint_y: None
+                height: self.minimum_height
+                row_default_height: '80dp'
+                row_force_default: True
+
+        BoxLayout:
+            size_hint_y: None
+            height: '48dp'
+            Button:
+                text: 'View Cart'
+                on_press: app.root.current = 'cart'
+
+<CartScreen>:
+    name: 'cart'
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: None
+            height: '48dp'
+            padding: 8
+            spacing: 8
+            Button:
+                text: '< Back'
+                on_press: app.root.current = 'catalog'
+            Label:
+                text: 'Cart'
+            Label:
+                id: total_label
+                text: '$0.00'
+        ScrollView:
+            GridLayout:
+                id: cart_container
+                cols: 1
+                size_hint_y: None
+                height: self.minimum_height
+                row_default_height: '48dp'
+                row_force_default: True
+        BoxLayout:
+            size_hint_y: None
+            height: '48dp'
+            Button:
+                text: 'Checkout'
+                on_press: app.checkout()

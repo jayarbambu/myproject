@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Admin - Products</title>
+  </head>
+  <body>
+    <header>
+      <h1>Admin</h1>
+      <div>
+        <a class="cart-link" href="/admin/stock">Stock</a>
+        <a class="cart-link" href="/">Catalog</a>
+        <a class="cart-link" href="/logout">Logout</a>
+      </div>
+    </header>
+    <main>
+      <a class="btn" href="/admin/add">Add Product</a>
+      <table class="cart-table">
+        <tr><th>ID</th><th>Name</th><th>Price</th><th></th></tr>
+        {% for p in products %}
+        <tr>
+          <td>{{ p.id }}</td>
+          <td>{{ p.name }}</td>
+          <td>${{ '%.2f'|format(p.price) }}</td>
+          <td>
+            <a class="btn small" href="/admin/edit/{{ p.id }}">Edit</a>
+            <a class="btn small" href="/admin/delete/{{ p.id }}">Delete</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </main>
+  </body>
+</html>
