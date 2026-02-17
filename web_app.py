@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, session, abort, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, session, abort, jsonify, session
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -6,6 +6,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import sample_products
+from models import User
+import json
+from sqlalchemy.exc import SQLAlchemyError
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shopping.db'
@@ -16,7 +19,6 @@ app.config['JSON_SORT_KEYS'] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -91,6 +93,30 @@ def cart_count():
 
 # === API ENDPOINTS FOR MOBILE APP ===
 
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    try:
+        data = request.get_json(force=True)
+        username = data.get('username')
+        password = data.get('password')
+
+        user = User.query.filter_by(username=username).first()
+
+        if not user or not check_password_hash(user.password_hash, password):
+            return jsonify({'status': 'error', 'message': 'Invalid credentials'}), 401
+
+        # Store user id in session
+        session['user_id'] = user.id
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Login successful',
+            'user_id': user.id
+        }), 200
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
 @app.route('/api/products', methods=['GET'])
 def api_products():
     """Return all products as JSON for mobile app"""
@@ -119,7 +145,206 @@ def api_product_detail(product_id):
         'image': product.image
     })
 
+@app.route('/api/cart', methods=['GET'])
+@login_required
+def api_cart():
+    """Return current cart as JSON"""
+    cart = session.get('cart', {})
+    items = []
+    total = 0.0
+    for pid, qty in cart.items():
+        p = Product.query.get(int(pid))
+        if p:
+            items.append({
+                'id': p.id,
+                'name': p.name,
+                'price': p.price,
+                'qty': qty,
+                'image': p.image,
+                'stock': p.stock
+            })
+            total += p.price * qty
+    return jsonify({'items': items, 'total': total})
 
+@app.route('/api/cart/save', methods=['POST'])
+def api_cart_save():
+    """Save guest cart to server (no login required)"""
+    data = request.get_json() or {}
+    cart = data.get('cart', {})
+    if not isinstance(cart, dict):
+        return jsonify({'success': False, 'message': 'Invalid cart format'}), 400
+    
+    # Store in session
+    session['guest_cart'] = cart
+    return jsonify({'success': True, 'message': 'Cart saved', 'cart': cart})
+
+@app.route('/api/cart/load', methods=['GET'])
+def api_cart_load():
+    """Load guest cart from server (no login required)"""
+    cart = session.get('guest_cart', {})
+    items = []
+    total = 0.0
+    for pid, qty in cart.items():
+        try:
+            p = Product.query.get(int(pid))
+            if p:
+                items.append({
+                    'id': p.id,
+                    'name': p.name,
+                    'price': p.price,
+                    'qty': qty,
+                    'image': p.image,
+                    'stock': p.stock
+                })
+                total += p.price * qty
+        except Exception:
+            continue
+    return jsonify({'success': True, 'items': items, 'total': total, 'cart': cart})
+
+@app.route('/api/cart/add', methods=['POST'])
+@login_required
+def api_cart_add():
+    """Add product to cart"""
+    data = request.get_json() or {}
+    product_id = data.get('product_id')
+    qty = int(data.get('qty', 1))
+    product = Product.query.get_or_404(product_id)
+
+    if product.stock < qty:
+        return jsonify({'success': False, 'message': f'{product.name} only has {product.stock} in stock'}), 400
+
+    cart = session.get('cart', {})
+    cart[str(product_id)] = cart.get(str(product_id), 0) + qty
+    session['cart'] = cart
+    return jsonify({'success': True, 'message': f'Added {qty} x {product.name} to cart', 'cart': cart})
+
+
+@app.route('/api/cart/remove', methods=['POST'])
+@login_required
+def api_cart_remove():
+    """Remove product from cart"""
+    data = request.get_json() or {}
+    product_id = str(data.get('product_id'))
+    cart = session.get('cart', {})
+    if product_id in cart:
+        cart.pop(product_id)
+        session['cart'] = cart
+        return jsonify({'success': True, 'message': 'Removed product from cart', 'cart': cart})
+    return jsonify({'success': False, 'message': 'Product not in cart'}), 400
+
+
+@app.route('/api/checkout', methods=['POST'])
+def api_checkout():
+    try:
+        #print(session.cookies)
+        
+        # 0. Check if user is logged in
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Login required'
+            }), 401
+
+        # 1. Get cart from JSON payload
+        data = request.get_json(force=True) or {}
+        cart = data.get('cart', {})
+
+        if not cart:
+            return jsonify({
+                'status': 'error',
+                'message': 'Cart is empty'
+            }), 400
+
+        total = 0.0
+        order_items = []
+
+        # 2. Check stock and calculate total
+        for pid_str, qty in cart.items():
+            try:
+                pid = int(pid_str)
+            except ValueError:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid product id: {pid_str}'
+                }), 400
+
+            p = Product.query.get(pid)
+            if not p:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Product {pid} not found'
+                }), 404
+
+            if p.stock < qty:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'{p.name} only has {p.stock} in stock'
+                }), 400
+
+            total += p.price * qty
+            order_items.append((p, qty))
+
+        # 3. Create order with logged-in user
+        order = Order(user_id=user_id, total=total)
+        db.session.add(order)
+        db.session.commit()
+
+        # 4. Add order items and decrement stock
+        for p, qty in order_items:
+            oi = OrderItem(
+                order_id=order.id,
+                product_id=p.id,
+                product_name=p.name,
+                price=p.price,
+                qty=qty
+            )
+            db.session.add(oi)
+            p.stock -= qty
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Order placed successfully',
+            'order_id': order.id,
+            'total': total
+        }), 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Database error: {str(e)}'
+        }), 500
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Server error: {str(e)}'
+        }), 500
+
+
+@app.route('/api/orders', methods=['GET'])
+@login_required
+def api_orders():
+    """Return all orders for the current user"""
+    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
+    results = []
+    for o in orders:
+        items = [{
+            'product_id': i.product_id,
+            'product_name': i.product_name,
+            'qty': i.qty,
+            'price': i.price
+        } for i in o.items]
+        results.append({
+            'order_id': o.id,
+            'total': o.total,
+            'created_at': o.created_at.isoformat(),
+            'items': items
+        })
+    return jsonify(results)
 # === WEB ROUTES ===
 
 @app.route('/')
@@ -335,4 +560,4 @@ def admin_stock():
 if __name__ == '__main__':
     with app.app_context():
         init_db()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)

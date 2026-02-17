@@ -1,0 +1,17 @@
+import json
+import os
+
+CART_FILE = "cart.json"
+
+def load_cart():
+    global cart
+    if os.path.exists(CART_FILE):
+        try:
+            with open(CART_FILE, "r") as f:
+                cart = json.load(f)
+        except:
+            cart = []
+
+def save_cart():
+    with open(CART_FILE, "w") as f:
+        json.dump(cart, f)
